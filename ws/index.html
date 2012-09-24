@@ -3,6 +3,7 @@
   <head>
     <title>WebSocket ...</title>
     <script src='http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js'></script>
+    <script src="/faye-browser-min.js"></script>
     <script>
       function debug(str)
       {
@@ -11,27 +12,33 @@
 
       $(document).ready(function()
       {
-        if (!("WebSocket" in window))
-        {
-          alert("Sorry, WebSockets unavailable.");
-          return;
-        }
+        var client = new Faye.Client('/ws');
 
-        var ws = new WebSocket("ws://localhost:9000/ws");
-        ws.onmessage = function(evt) { $("#msg").append("<p>" + evt.data + "</p>"); };
-        ws.onclose = function() { debug("socket closed"); };
-        ws.onopen = function() { debug("connected..."); };
+        var subscription = client.subscribe('/pong', function(message) {
+          debug(message.text)
+        });
+
+        client.bind('transport:down', function() {
+          debug("Server not responds")
+        });
+
+        client.bind('transport:up', function() {
+          debug("Server up")
+        });
+
 
         $('#submit').click(function()
         {
           var nick = $('#nick').val();
           var msg = $('#message').val();
 
-          ws.send(nick + ": " + msg);
+          publication = client.publish('/ping', {text: (nick + ": " + msg) }); 
+
           return false;
         });
 
       });
+
     </script>
   </head>
   <body>

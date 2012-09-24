@@ -1,34 +1,46 @@
 require 'goliath'
 require 'goliath/websocket'
+require 'goliath/rack/templates'
 
-class Websocket < Goliath::WebSocket
+require 'faye'
+Faye::WebSocket.load_adapter('goliath')
+
+
+class EchoExtension
+  def incoming(message, callback)
+    p message
+    unless message['channel'] == '/ping'
+      return callback.call(message)
+    end
+
+    faye_client.publish('/pong', message['data'])
+    
+    callback.call(message)
+  end
+
+  def faye_client
+    @faye_client ||= Faye::Client.new('http://localhost:3000/ws')
+  end
+end
+
+
+class Websocket < Goliath::API
   
   use Goliath::Rack::Favicon, File.expand_path(File.dirname(__FILE__) + '/ws/favicon.ico')
-  
-  def on_open(env)
-    env.logger.info("WS OPEN")
-    env['subscription'] = env.channel.subscribe { |m| env.stream_send(m) }
-  end
 
-  def on_message(env, msg)
-    env.logger.info("WS MESSAGE: #{msg}")
-    env.channel << msg
-  end
+  use( Rack::Static,
+    :root => Goliath::Application.app_path('ws'),
+    :urls => ['/index.html','/faye-browser-min.js'],
+    :cache_control => 'public, max-age=3600'
+  )
 
-  def on_close(env)
-    env.logger.info("WS CLOSED")
-    env.channel.unsubscribe(env['subscription'])
-  end
+  use Faye::RackAdapter, :mount      => '/ws',
+                         :timeout    => 25,
+                         :extensions => EchoExtension.new
 
-  def on_error(env, error)
-    env.logger.error error
-  end
+  include Goliath::Rack::Templates
 
   def response(env)
-    if env['REQUEST_PATH'] == '/ws'
-      super(env)
-    else
-      [200, {}, {}]
-    end
+    [200, {'Content-Type' => 'text/html'}, '<meta http-equiv="refresh" content="0;URL=\'/index.html\'">']
   end
 end
