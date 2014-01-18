@@ -1,4 +1,4 @@
 goliath-sockjs-example
 ======================
 
-Goliath + SockJS . WebSockets example
+Goliath + SockJS . WebSockets example.
